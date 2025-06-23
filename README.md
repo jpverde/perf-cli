@@ -167,7 +167,7 @@ PID      NAME                 CPU%       MEM%       MEM(MB)
 9012     node                 8.70       4.50       256       
 ```
 
-Note: Verbose output shows all processes, not just the top 5.
+*Note: Verbose output shows all processes, not just the top 5.*
 
 ### Combine Multiple Flags
 
