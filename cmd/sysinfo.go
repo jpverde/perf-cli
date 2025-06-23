@@ -10,6 +10,7 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/cobra"
+	//"github.com/itchyny/gojq"
 )
 
 type ProcessInfo struct {
@@ -48,18 +49,22 @@ func run(cmd *cobra.Command, args []string) {
 		logical, _ := cpu.Counts(true)
 		fmt.Printf("Physical CPUs: %v, Logical CPUs: %v\n", physical, logical)
 
-		totalPercent, _ := cpu.Percent(1*time.Second, false)
-		fmt.Println("------- Total Physical CPU Usage -------")
+		fmt.Println("Waiting for 3 seconds...")
+		totalPercent, _ := cpu.Percent(3*time.Second, false)
+		fmt.Println("------- Total CPU Usage -------")
 		for i, percent := range totalPercent {
 			fmt.Printf("Total CPU %d: %f%%\n", i, percent)
 		}
-		fmt.Println("----------------------------------------")
-		perPercent, _ := cpu.Percent(1*time.Second, true)
-		fmt.Println("------- Per logical CPU Usage -------")
-		for i, percent := range perPercent {
-			fmt.Printf("Core %d: %f%%\n", i, percent)
+		if verbose {
+			fmt.Println("----------------------------------------")
+			fmt.Println("Waiting for 3 seconds...")
+			perPercent, _ := cpu.Percent(3*time.Second, true)
+			fmt.Println("------- Per logical CPUs Usage -------")
+			for i, percent := range perPercent {
+				fmt.Printf("CPU %d: %f%%\n", i, percent)
+			}
+			fmt.Println("----------------------------------------")
 		}
-		fmt.Println("----------------------------------------")
 	}
 	if getMem {
 		v, _ := mem.VirtualMemory()
@@ -68,7 +73,22 @@ func run(cmd *cobra.Command, args []string) {
 		usedMB := v.Used / 1024 / 1024
 		fmt.Printf("Total: %v MB, Free: %v MB, Used: %v MB, UsedPercent: %f%%\n", totalMB, freeMB, usedMB, v.UsedPercent)
 		if verbose {
-			fmt.Println(v)
+			s, _ := mem.SwapMemory()
+			sin := s.Sin / 1024 / 1024 // Convert to MB
+			fmt.Printf("Sin: %v MB\n", sin)
+
+			sout := s.Sout / 1024 / 1024 // Convert to MB
+			fmt.Printf("Sout: %v MB\n", sout)
+
+			swapTotal := s.Total / 1024 / 1024 // Convert to MB
+			fmt.Printf("SwapTotal: %v MB\n", swapTotal)
+
+			swapFree := s.Free / 1024 / 1024 // Convert to MB
+			fmt.Printf("SwapFree: %v MB\n", swapFree)
+
+			swapUsed := uint64(s.UsedPercent)
+			fmt.Printf("SwapUsedPercent: %v%%\n", swapUsed)
+
 		}
 	}
 	if getDisk {
@@ -77,6 +97,24 @@ func run(cmd *cobra.Command, args []string) {
 		freeMB := diskUsage.Free / 1024 / 1024
 		usedMB := diskUsage.Used / 1024 / 1024
 		fmt.Printf("Total: %v MB, Free: %v MB, Used: %v MB, UsedPercent: %f%%\n", totalMB, freeMB, usedMB, diskUsage.UsedPercent)
+		if verbose {
+			partitions, err := disk.Partitions(true)
+			if err != nil {
+				fmt.Printf("Error getting disk partitions: %v\n", err)
+				return
+			}
+			for _, partition := range partitions {
+				usage, err := disk.Usage(partition.Mountpoint)
+				if err != nil {
+					fmt.Printf("Error getting disk usage for partition %s: %v\n", partition.Mountpoint, err)
+					continue
+				}
+				totalMB := usage.Total / 1024 / 1024
+				freeMB := usage.Free / 1024 / 1024
+				usedMB := usage.Used / 1024 / 1024
+				fmt.Printf("Partition: %s, Total: %v MB, Free: %v MB, Used: %v MB, UsedPercent: %f%%\n", partition.Mountpoint, totalMB, freeMB, usedMB, usage.UsedPercent)
+			}
+		}
 	}
 	if getTop {
 		getTopProcesses()
@@ -126,6 +164,17 @@ func getTopProcesses() {
 			MemPercent: memPercent,
 			MemoryMB:   memoryMB,
 		})
+	}
+
+	if verbose {
+		fmt.Println("\nAll processes:")
+		fmt.Printf("%-8s %-20s %-10s %-10s %-10s\n", "PID", "NAME", "CPU%", "MEM%", "MEM(MB)")
+		fmt.Println("----------------------------------------------------------------")
+		for _, p := range processes {
+			fmt.Printf("%-8d %-20s %-10.2f %-10.2f %-10d\n",
+				p.PID, p.Name, p.CPUPercent, p.MemPercent, p.MemoryMB)
+		}
+		return
 	}
 
 	// Sort by CPU usage (descending)
