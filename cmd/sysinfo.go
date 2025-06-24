@@ -7,6 +7,8 @@ import (
 
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/host"
+	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/shirou/gopsutil/v4/process"
 	"github.com/spf13/cobra"
@@ -21,11 +23,15 @@ type ProcessInfo struct {
 	MemoryMB   uint64
 }
 
+// Flags
 var getCpu bool
 var getMem bool
 var getDisk bool
 var getTop bool
 var verbose bool
+var getOs bool
+var getLoad bool
+
 var sysInfoCmd = &cobra.Command{
 	Use:     "sysinfo",
 	Aliases: []string{"sys", "sysinfo"},
@@ -40,6 +46,8 @@ func init() {
 	sysInfoCmd.Flags().BoolVarP(&getDisk, "disk", "d", false, "Get Disk information")
 	sysInfoCmd.Flags().BoolVarP(&getTop, "top", "t", false, "Get Top 5 processes by CPU and Memory usage")
 	sysInfoCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Get verbose output")
+	sysInfoCmd.Flags().BoolVarP(&getOs, "os", "o", false, "Get OS information")
+	sysInfoCmd.Flags().BoolVarP(&getLoad, "load", "l", false, "Get Load information")
 	rootCmd.AddCommand(sysInfoCmd)
 }
 
@@ -118,6 +126,27 @@ func run(cmd *cobra.Command, args []string) {
 	}
 	if getTop {
 		getTopProcesses()
+	}
+	if getOs {
+		osInfo, err := host.Info()
+		if err != nil {
+			fmt.Printf("Error getting OS information: %v\n", err)
+			return
+		}
+		if verbose {
+			fmt.Printf("OS: %s, Arch: %s, Platform: %s, PlatformFamily: %s, PlatformVersion: %s, KernelVersion: %s\n", osInfo.OS, osInfo.KernelArch, osInfo.Platform, osInfo.PlatformFamily, osInfo.PlatformVersion, osInfo.KernelVersion)
+			fmt.Printf("Uptime: %d, Boot time: %d\n", osInfo.Uptime, osInfo.BootTime)
+		} else {
+			fmt.Printf("Platform: %s, Version: %s\n", osInfo.Platform, osInfo.PlatformVersion)
+		}
+	}
+	if getLoad {
+		load, err := load.Avg()
+		if err != nil {
+			fmt.Printf("Error getting load: %v\n", err)
+			return
+		}
+		fmt.Printf("Load 1: %v\nLoad 5: %v\nLoad 15: %v\n", load.Load1, load.Load5, load.Load15)
 	}
 }
 
